@@ -14,8 +14,8 @@
 
 -- Feel free to change those settings
 local frequency = 1.0 -- Speed in seconds to check for clipboard changes. If you check too frequently, you will loose performance, if you check sparsely you will loose copies
-local hist_size = 100 -- How many items to keep on history
-local label_length = 120 -- How wide (in characters) the dropdown menu should be. Copies larger than this will have their label truncated and end with "…" (unicode for elipsis ...)
+local hist_size = 80 -- How many items to keep on history
+local label_length = 50 -- How wide (in characters) the dropdown menu should be. Copies larger than this will have their label truncated and end with "…" (unicode for elipsis ...)
 local honor_clearcontent = false --asmagill request. If any application clears the pasteboard, we also remove it from the history https://groups.google.com/d/msg/hammerspoon/skEeypZHOmM/Tg8QnEj_N68J
 local pasteOnSelect = false -- Auto-type on click
 
@@ -27,6 +27,7 @@ local settings = require("hs.settings") -- http://www.hammerspoon.org/docs/hs.se
 local last_change = pasteboard.changeCount() -- displays how many times the pasteboard owner has changed // Indicates a new copy has been made
 
 --Array to store the clipboard history
+local favorite = settings.get("childe.hs.favorite") or {} --If no history is saved on the system, create an empty history
 local clipboard_history = settings.get("so.victor.hs.jumpcut") or {} --If no history is saved on the system, create an empty history
 
 -- Append a history counter to the menu
@@ -39,7 +40,25 @@ function setTitle()
    end
 end
 
+function putOnPasteFavorite(string,key)
+   if (pasteOnSelect) then
+      hs.eventtap.keyStrokes(string)
+      pasteboard.setContents(string)
+      last_change = pasteboard.changeCount()
+   else
+      if (key.alt == true) then -- If the option/alt key is active when clicking on the menu, perform a "direct paste", without changing the clipboard
+         hs.eventtap.keyStrokes(string) -- Defeating paste blocking http://www.hammerspoon.org/go/#pasteblock
+      else
+         pasteboard.setContents(string)
+         last_change = pasteboard.changeCount() -- Updates last_change to prevent item duplication when putting on paste
+      end
+   end
+end
+
 function putOnPaste(string,key)
+   table.insert(favorite, string)
+   settings.set("childe.hs.favorite",favorite) -- updates the saved history
+
    if (pasteOnSelect) then
       hs.eventtap.keyStrokes(string)
       pasteboard.setContents(string)
@@ -57,8 +76,13 @@ end
 -- Clears the clipboard and history
 function clearAll()
    pasteboard.clearContents()
+
    clipboard_history = {}
    settings.set("so.victor.hs.jumpcut",clipboard_history)
+
+   favorite = {}
+   settings.set("childe.hs.favorite",favorite)
+
    now = pasteboard.changeCount()
    setTitle()
 end
@@ -96,6 +120,19 @@ populateMenu = function(key)
          end -- end if else
       end-- end for
    end-- end if else
+
+   -- insert favorite on top
+   if (#favorite > 0) then
+      table.insert(menuData,1, {title="-"})
+      for k,v in pairs(favorite) do
+         if (string.len(v) > label_length) then
+            table.insert(menuData,1, {title=string.sub(v,0,label_length).."…", fn = function() putOnPasteFavorite(v,key) end }) -- Truncate long strings
+         else
+            table.insert(menuData,1, {title=v, fn = function() putOnPasteFavorite(v,key) end })
+         end -- end if else
+      end-- end for
+   end-- end if else
+
    -- footer
    table.insert(menuData, {title="-"})
    table.insert(menuData, {title="Clear All", fn = function() clearAll() end })
