@@ -56,9 +56,6 @@ function putOnPasteFavorite(string,key)
 end
 
 function putOnPaste(string,key)
-   table.insert(favorite, string)
-   settings.set("childe.hs.favorite",favorite) -- updates the saved history
-
    if (pasteOnSelect) then
       hs.eventtap.keyStrokes(string)
       pasteboard.setContents(string)
@@ -68,6 +65,8 @@ function putOnPaste(string,key)
          hs.eventtap.keyStrokes(string) -- Defeating paste blocking http://www.hammerspoon.org/go/#pasteblock
       else
          pasteboard.setContents(string)
+         table.insert(favorite, string)
+         settings.set("childe.hs.favorite",favorite) -- updates the saved history
          last_change = pasteboard.changeCount() -- Updates last_change to prevent item duplication when putting on paste
       end
    end
