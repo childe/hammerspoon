@@ -1,4 +1,4 @@
-local s = hs.speech.new("samantha.premium")
+local s = hs.speech.new("samantha")
 
 hs.hotkey.bind({"cmd", "alt", "ctrl"}, "SPACE", function()
   local c = hs.pasteboard.getContents()
