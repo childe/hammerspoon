@@ -1,4 +1,4 @@
-local urlApi = 'https://www.tianqiapi.com/api/?version=v1'
+local urlApi = 'https://www.tianqiapi.com/api/?appid=REDACTED&appsecret=REDACTED&version=v1'
 local menubar = hs.menubar.new()
 local menuData = {}
 
