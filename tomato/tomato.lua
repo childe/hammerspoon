@@ -1,36 +1,18 @@
-local msg = "have a break"
-local duration = 2
+local msg = "take a break"
+local duration = ""
 local yesIsee = false
-local breakTime = 30*60
+local breakTime = 25*60
+local uuid = ''
 
-function alertBreak(i, total)
+function alertBreak()
     print(msg)
-
-    if i >= total then
-        return
-    end
-
-    if yesIsee then
-        yesIsee = false
-        return
-    end
-
-    hs.alert.show(msg, duration)
-    hs.timer.doAfter(duration+1, function() alertBreak(i+1, total) end)
+    uuid = hs.alert.show(msg, duration)
 end
 
-function sparkBreak()
-    alertBreak(1, breakTime/(duration+1))
-end
-
-hs.timer.doEvery(breakTime, sparkBreak)
 
 hs.hotkey.bind({"cmd", "alt", "ctrl"}, "0", function()
-    if yesIsee then
-        yesIsee = false
-        print("tomato show")
-    else
-        yesIsee = true
-        print("tomato hide")
-    end
+    hs.alert.closeSpecific(uuid)
+    hs.timer.doAfter(breakTime, alertBreak)
 end)
+
+hs.timer.doAfter(breakTime, alertBreak)
