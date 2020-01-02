@@ -11,6 +11,7 @@ end
 
 
 hs.hotkey.bind({"cmd", "alt", "ctrl"}, "0", function()
+    print(string.format("close `%s`",uuid))
     hs.alert.closeSpecific(uuid)
     hs.timer.doAfter(breakTime, alertBreak)
 end)
