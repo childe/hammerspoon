@@ -1,45 +1,61 @@
+local last_change = hs.pasteboard.changeCount()
+local pasteboard = require("hs.pasteboard") -- http://www.hammerspoon.org/docs/hs.pasteboard.html
+
 clipboard = hs.chooser.new(function (choice)
   if choice then
-    hs.pasteboard.setContents(choice.content)
+    pasteboard.setContents(choice.content)
     --hs.eventtap.keyStroke({ "cmd" }, "v")
   end
 end)
 
 local history = {}
 function addHistoryFromPasteboard()
-  local contentTypes = hs.pasteboard.contentTypes()
-
-  local item = {}
-  for index, uti in ipairs(contentTypes) do
-    if uti == "public.utf8-plain-text" then
-      local text = hs.pasteboard.readString()
-      item.text = string.gsub(text, "[\r\n]+", " ")
-      item.content = text;
-      break
+    now = pasteboard.changeCount()
+    --print(last_change)
+    --print(now)
+    local item = {}
+    if (now <= last_change) then
+        return
     end
-  end
 
-  local exist = false
-  for _,v in pairs(history) do
-      if v.text == item.text then
-          exist = true
-          break
-      end
-  end
+    current_clipboard = pasteboard.getContents()
+    -- asmagill requested this feature. It prevents the history from keeping items removed by password managers
+    --print(current_clipboard)
+    if (current_clipboard == nil) then
+        return
+    end
 
-  if exist then
-  else
+    item.text = current_clipboard
+    item.content = current_clipboard
+    last_change = now
+
+    local exist = false
+    for _,v in pairs(history) do
+        --print(item.text)
+        --print(v.text)
+        --print("==")
+        if v.text == item.text then
+            exist = true
+            break
+        end
+    end
+    --print(exist)
+
+    if not exist then
+      --print(item.text)
+      --print("insert to clipboard histroy")
+      --print(#history)
       table.insert(history, 1, item)
-  end
+    end
 end
 
-local preChangeCount = hs.pasteboard.changeCount()
-local watcher = hs.timer.new(1.0, function ()
+watcher = hs.timer.new(1.0, function ()
      addHistoryFromPasteboard()
 end)
 watcher:start()
 
 hs.hotkey.bind({ "cmd", "shift" }, "v", function ()
+  print(#history)
   clipboard:choices(history)
   clipboard:query(nil)
   clipboard:show()
