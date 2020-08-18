@@ -29,24 +29,18 @@ function addHistoryFromPasteboard()
     item.content = current_clipboard
     last_change = now
 
-    local exist = false
-    for _,v in pairs(history) do
+    for i,v in pairs(history) do
         --print(item.text)
         --print(v.text)
         --print("==")
         if v.text == item.text then
-            exist = true
+            table.remove(history, i)
             break
         end
     end
     --print(exist)
 
-    if not exist then
-      --print(item.text)
-      --print("insert to clipboard histroy")
-      --print(#history)
-      table.insert(history, 1, item)
-    end
+    table.insert(history, 1, item)
 end
 
 watcher = hs.timer.new(1.0, function ()
