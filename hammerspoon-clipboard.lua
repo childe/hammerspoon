@@ -25,6 +25,10 @@ function addHistoryFromPasteboard()
         return
     end
 
+    if string.len(current_clipboard) > 100 then
+        return
+    end
+
     item.text = current_clipboard
     item.content = current_clipboard
     last_change = now
