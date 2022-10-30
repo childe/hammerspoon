@@ -11,7 +11,7 @@ end)
 local history = {}
 
 function initHistory()
-    for line in io.lines("/Users/liujia/.hammerspoon/clipboard/init.txt") do
+    for line in io.lines(os.getenv("HOME") .. "/.hammerspoon/clipboard/init.txt") do
         print(line)
         local item = {}
         item.text = line
