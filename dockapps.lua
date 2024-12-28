@@ -24,6 +24,7 @@ function showWindowList()
   appChooser:show()
 end
 
+-- thanks to philsnow @ https://stackoverflow.com/questions/77378977/hammerspoon-bind-cmd-shift-without-any-other-key
 function same_keys(t1, t2)
    return _same_keys_oneway(t1, t2) and _same_keys_oneway(t2, t1)
 end
