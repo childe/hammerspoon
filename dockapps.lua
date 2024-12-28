@@ -16,10 +16,44 @@ local function getWindows()
   return windows
 end
 
-hs.hotkey.bind({"cmd"}, "0", function()
+function showWindowList()
   local windows = getWindows()
   print(#windows, 'windows')
   appChooser:choices(windows)
   appChooser:query(nil)
   appChooser:show()
-end)
+end
+
+function same_keys(t1, t2)
+   return _same_keys_oneway(t1, t2) and _same_keys_oneway(t2, t1)
+end
+
+function _same_keys_oneway(t1, t2)
+   for k, _ in pairs(t1) do
+      local found = false
+      for j, _ in pairs(t2) do
+         if k == j then found = true end
+      end
+      if found == false then return false end
+   end
+   return true
+end
+
+etap_last_flags = {}
+etap = hs.eventtap.new(
+   {
+      hs.eventtap.event.types.flagsChanged,
+   },
+   function(ev)
+      local flags = ev:getFlags()
+
+      if same_keys(flags, {cmd = true, ctrl = true}) then
+         if (same_keys(etap_last_flags, {cmd = true}) or
+             same_keys(etap_last_flags, {ctrl = true})) then
+              showWindowList()
+         end
+      end
+
+      etap_last_flags = flags
+   end
+):start()
