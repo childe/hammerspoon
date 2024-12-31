@@ -42,19 +42,18 @@ end
 
 etap_last_flags = {}
 etap = hs.eventtap.new(
-   {
-      hs.eventtap.event.types.flagsChanged,
-   },
-   function(ev)
-      local flags = ev:getFlags()
+{
+    hs.eventtap.event.types.flagsChanged,
+},
+function(ev)
+    local flags = ev:getFlags()
 
-      if same_keys(flags, {cmd = true, ctrl = true}) then
-         if (same_keys(etap_last_flags, {cmd = true}) or
-             same_keys(etap_last_flags, {ctrl = true})) then
-              showWindowList()
-         end
-      end
+    if same_keys(flags, {cmd = true, ctrl = true}) then
+        if same_keys(etap_last_flags, {cmd = true}) then
+            showWindowList()
+        end
+    end
 
-      etap_last_flags = flags
-   end
+    etap_last_flags = flags
+end
 ):start()
