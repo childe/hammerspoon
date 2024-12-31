@@ -9,7 +9,9 @@ local function getWindows()
 
   for i, win in ipairs(hs.window.allWindows()) do
     local item = {}
-    item.text = win:title()
+    item.text = win:application():name()
+    item.subText = win:title() 
+    --item.image = win:snapshot()
     item.win = win
     table.insert(windows, 1, item)
   end
