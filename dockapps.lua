@@ -1,61 +1,158 @@
-appChooser = hs.chooser.new(function (choice)
-  if choice then
-    choice.win:focus()
+local core = require("dockapps_core")
+
+local M = {}
+local wf = hs.window.filter
+local iconCache = {}
+local activeScopePid = nil
+local lastFlags = {}
+
+local function safeCall(object, methodName, ...)
+  if object == nil then return nil end
+  local method = object[methodName]
+  if type(method) ~= "function" then return nil end
+
+  local ok, result = pcall(method, object, ...)
+  if not ok then return nil end
+  return result
+end
+
+local function appIcon(application)
+  local path = safeCall(application, "path")
+  if type(path) ~= "string" or path == "" then return nil end
+
+  if iconCache[path] == nil then
+    local ok, image = pcall(hs.image.iconForFile, path)
+    iconCache[path] = ok and image or false
   end
-end)
 
-local function getWindows()
-  local windows = {}
+  return iconCache[path] or nil
+end
 
-  for i, win in ipairs(hs.window.allWindows()) do
-    local item = {}
-    item.text = win:application():name()
-    item.subText = win:title() 
-    --item.image = win:snapshot()
-    item.win = win
-    table.insert(windows, 1, item)
+local function windowRecord(window)
+  local id = safeCall(window, "id")
+  local application = safeCall(window, "application")
+  if type(id) ~= "number" or application == nil then return nil end
+
+  local appName = safeCall(application, "name")
+  local pid = safeCall(application, "pid")
+  if type(appName) ~= "string" or appName == "" or type(pid) ~= "number" then
+    return nil
   end
-  return windows
+
+  return {
+    id = id,
+    pid = pid,
+    appName = appName,
+    title = safeCall(window, "title"),
+    minimized = safeCall(window, "isMinimized") == true,
+    hidden = safeCall(application, "isHidden") == true,
+    image = appIcon(application),
+  }
 end
 
-function showWindowList()
-  local windows = getWindows()
-  print(#windows, 'windows')
-  appChooser:choices(windows)
-  appChooser:query(nil)
-  appChooser:show()
+local windowFilter = wf.new()
+  :setDefaultFilter({ allowRoles = { "AXStandardWindow", "AXDialog" } })
+  :setSortOrder(wf.sortByFocusedLast)
+
+local chooser
+
+local function choicesFor(scopePid)
+  local ok, windows = pcall(windowFilter.getWindows, windowFilter, wf.sortByFocusedLast)
+  if not ok or type(windows) ~= "table" then
+    hs.alert.show("Unable to read the window list")
+    return {}
+  end
+
+  local records = {}
+  for _, window in ipairs(windows) do
+    local record = windowRecord(window)
+    if record ~= nil then records[#records + 1] = record end
+  end
+
+  return core.buildChoices(records, scopePid)
 end
 
--- thanks to philsnow @ https://stackoverflow.com/questions/77378977/hammerspoon-bind-cmd-shift-without-any-other-key
-function same_keys(t1, t2)
-   return _same_keys_oneway(t1, t2) and _same_keys_oneway(t2, t1)
+
+local function focusChoice(choice)
+  if choice == nil or type(choice.windowID) ~= "number" then return end
+
+  local ok, window = pcall(hs.window.get, choice.windowID)
+  if not ok or window == nil then
+    hs.alert.show("Window is no longer available")
+    return
+  end
+
+  local application = safeCall(window, "application")
+  if safeCall(window, "isMinimized") == true then
+    safeCall(window, "unminimize")
+  end
+  if safeCall(application, "isHidden") == true then
+    safeCall(application, "unhide")
+  end
+  safeCall(application, "activate", true)
+
+  if safeCall(window, "focus") == nil then
+    hs.alert.show("Unable to focus the selected window")
+  end
 end
 
-function _same_keys_oneway(t1, t2)
-   for k, _ in pairs(t1) do
-      local found = false
-      for j, _ in pairs(t2) do
-         if k == j then found = true end
-      end
-      if found == false then return false end
-   end
-   return true
+chooser = hs.chooser.new(focusChoice)
+chooser:searchSubText(true)
+
+local function show(scopePid)
+  if safeCall(chooser, "isVisible") == true then return end
+
+  activeScopePid = scopePid
+  chooser:choices(choicesFor(scopePid))
+  chooser:query(nil)
+  chooser:show()
 end
 
-etap_last_flags = {}
-etap = hs.eventtap.new(
-{
-    hs.eventtap.event.types.flagsChanged,
-},
-function(ev)
-    local flags = ev:getFlags()
-
-    if same_keys(flags, {cmd = true, ctrl = true}) then
-        if same_keys(etap_last_flags, {cmd = true}) then
-            showWindowList()
-        end
-    end
-
-    etap_last_flags = flags
+function M.showAll()
+  show(nil)
 end
-):start()
+
+function M.showCurrentApp()
+  local application = hs.application.frontmostApplication()
+  local pid = safeCall(application, "pid")
+  if type(pid) ~= "number" then
+    hs.alert.show("No active application")
+    return
+  end
+  show(pid)
+end
+
+local function refreshVisibleChooser()
+  if safeCall(chooser, "isVisible") == true then
+    chooser:choices(choicesFor(activeScopePid))
+  end
+end
+
+windowFilter:subscribe({
+  wf.windowFocused,
+  wf.windowsChanged,
+  wf.windowTitleChanged,
+  wf.windowMinimized,
+  wf.windowUnminimized,
+  wf.windowHidden,
+  wf.windowUnhidden,
+}, refreshVisibleChooser)
+
+-- Keep the original gesture: press Cmd, then add Ctrl while still holding Cmd.
+local modifierTap = hs.eventtap.new({ hs.eventtap.event.types.flagsChanged }, function(event)
+  local flags = event:getFlags()
+  if core.shouldOpen(lastFlags, flags) then M.showAll() end
+  lastFlags = flags
+  return false
+end):start()
+
+-- A separate searchable list for windows belonging to the current application.
+local currentAppHotkey = hs.hotkey.bind({ "ctrl", "alt", "cmd" }, "w", M.showCurrentApp)
+
+-- Retain these Hammerspoon objects for the lifetime of the loaded module.
+M.windowFilter = windowFilter
+M.chooser = chooser
+M.modifierTap = modifierTap
+M.currentAppHotkey = currentAppHotkey
+
+return M
