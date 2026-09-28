@@ -18,7 +18,11 @@ local function app(name, pid, hidden)
   function value:pid() return pid end
   function value:path() return "/Applications/" .. name .. ".app" end
   function value:isHidden() return hidden end
-  function value:activate() self.activated = true return true end
+  function value:activate(allWindows)
+    self.activated = true
+    self.activatedAllWindows = allWindows
+    return true
+  end
   return value
 end
 
@@ -133,6 +137,7 @@ chooser.callback({ windowID = 1 })
 assertEqual(windows[2].unminimized, true, "selected minimized window is restored")
 assertEqual(windows[2].focused, true, "selected window is focused")
 assertEqual(iterm.activated, true, "selected application is activated")
+assertEqual(iterm.activatedAllWindows, false, "unselected application windows are not raised")
 
 chooser.callback({ windowID = 999 })
 assertEqual(state.alerts[#state.alerts], "Window is no longer available", "stale selection is handled")
