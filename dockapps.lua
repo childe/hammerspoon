@@ -89,7 +89,7 @@ local function focusChoice(choice)
   if safeCall(application, "isHidden") == true then
     safeCall(application, "unhide")
   end
-  safeCall(application, "activate", true)
+  safeCall(application, "activate", false)
 
   if safeCall(window, "focus") == nil then
     hs.alert.show("Unable to focus the selected window")
