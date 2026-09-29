@@ -16,8 +16,8 @@
 - Modify: `tests/dockapps_integration_test.lua`
 - Modify: `dockapps.lua`
 
-- [ ] Add 14 extra fake windows so the test contains 16 choices, then expect 15 visible rows.
-- [ ] Run the integration test and observe the current implementation returning 11 rows.
-- [ ] Change `maxVisibleRows` from 11 to 15.
-- [ ] Run both tests and LuaJIT bytecode compilation.
+- [x] Add 14 extra fake windows so the test contains 16 choices, then expect 15 visible rows.
+- [x] Run the integration test and observe the current implementation returning 11 rows.
+- [x] Change `maxVisibleRows` from 11 to 15.
+- [x] Run both tests and LuaJIT bytecode compilation.
 - [ ] Restart Hammerspoon and verify its Lua setup completes.
