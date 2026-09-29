@@ -16,18 +16,18 @@
 - Modify: `tests/dockapps_integration_test.lua`
 - Modify: `dockapps.lua`
 
-- [ ] **Step 1: Add a failing test**
+- [x] **Step 1: Add a failing test**
 
 Append enough fake windows to produce 12 choices, call `showAll`, and assert
 that all 12 choices remain searchable while `chooser.rowCount` is 11.
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 Run: `/opt/homebrew/bin/luajit tests/dockapps_integration_test.lua`
 
 Expected: failure showing the row count is 12 rather than 11.
 
-- [ ] **Step 3: Add the cap**
+- [x] **Step 3: Add the cap**
 
 Define `local maxVisibleRows = 11` and change the sizing expression to:
 
@@ -35,7 +35,7 @@ Define `local maxVisibleRows = 11` and change the sizing expression to:
 chooser:rows(math.max(1, math.min(#choices, maxVisibleRows)))
 ```
 
-- [ ] **Step 4: Verify GREEN**
+- [x] **Step 4: Verify GREEN**
 
 Run both Lua tests and compile `dockapps.lua` with `luajit -b`. Expect all
 commands to exit zero.

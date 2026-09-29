@@ -2,6 +2,7 @@ local core = require("dockapps_core")
 
 local M = {}
 local wf = hs.window.filter
+local maxVisibleRows = 11
 local iconCache = {}
 local activeScopePid = nil
 local lastFlags = {}
@@ -74,7 +75,7 @@ end
 
 local function applyChoices(scopePid)
   local choices = choicesFor(scopePid)
-  chooser:rows(math.max(1, #choices))
+  chooser:rows(math.max(1, math.min(#choices, maxVisibleRows)))
   chooser:choices(choices)
 end
 
