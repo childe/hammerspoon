@@ -35,4 +35,4 @@ new one. Keep the existing callback and refresh paths pointed at that instance.
 
 - [x] Restart Hammerspoon.
 - [x] Verify the Lua setup completes without an error.
-- [ ] Ask the user to run the vertical-once, horizontal-twice visual check.
+- [x] Ask the user to run the vertical-once, horizontal-twice visual check.
