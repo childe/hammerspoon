@@ -72,6 +72,11 @@ local function choicesFor(scopePid)
   return core.buildChoices(records, scopePid)
 end
 
+local function applyChoices(scopePid)
+  local choices = choicesFor(scopePid)
+  chooser:rows(math.max(1, #choices))
+  chooser:choices(choices)
+end
 
 local function focusChoice(choice)
   if choice == nil or type(choice.windowID) ~= "number" then return end
@@ -103,7 +108,7 @@ local function show(scopePid)
   if safeCall(chooser, "isVisible") == true then return end
 
   activeScopePid = scopePid
-  chooser:choices(choicesFor(scopePid))
+  applyChoices(scopePid)
   chooser:query(nil)
   chooser:show()
 end
@@ -124,7 +129,7 @@ end
 
 local function refreshVisibleChooser()
   if safeCall(chooser, "isVisible") == true then
-    chooser:choices(choicesFor(activeScopePid))
+    applyChoices(activeScopePid)
   end
 end
 

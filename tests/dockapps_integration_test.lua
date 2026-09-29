@@ -48,6 +48,7 @@ local windows = {
 
 local chooser = { visible = false }
 function chooser:choices(value) self.choiceList = value return self end
+function chooser:rows(value) self.rowCount = value return self end
 function chooser:query(value) self.queryValue = value return self end
 function chooser:show() self.visible = true return self end
 function chooser:isVisible() return self.visible end
@@ -123,14 +124,20 @@ assertEqual(hotkey.key, "w", "current-app hotkey is registered")
 
 dockapps.showAll()
 assertEqual(#chooser.choiceList, 3, "all scope contains every known window")
+assertEqual(chooser.rowCount, 3, "all choices are shown without scrolling")
 assertEqual(chooser.choiceList[1].windowID, 2, "filter MRU order is retained")
 assertEqual(chooser.choiceList[2].subText, "[Minimized] shell", "minimized state is displayed")
 assertEqual(chooser.choiceList[3].subText, "[Hidden] Docs", "hidden state is displayed")
 assertEqual(state.iconCalls, 2, "icons are cached per application")
 
+table.remove(windows, 3)
+filter.callback()
+assertEqual(chooser.rowCount, 2, "visible chooser resizes after a window-list refresh")
+
 chooser.visible = false
 dockapps.showCurrentApp()
 assertEqual(#chooser.choiceList, 2, "current-app scope only contains front app windows")
+assertEqual(chooser.rowCount, 2, "current-app chooser shows every result")
 assertEqual(chooser.choiceList[1].windowID, 2, "current-app scope retains MRU order")
 
 chooser.callback({ windowID = 1 })

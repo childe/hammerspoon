@@ -16,19 +16,19 @@
 - Modify: `tests/dockapps_integration_test.lua`
 - Modify: `dockapps.lua`
 
-- [ ] **Step 1: Add a failing assertion**
+- [x] **Step 1: Add a failing assertion**
 
 Add a `chooser:rows(value)` fake and assert `chooser.rowCount == 3` after
 `dockapps.showAll()`.
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 Run: `/opt/homebrew/bin/luajit tests/dockapps_integration_test.lua`
 
 Expected: failure reporting that the expected row count is `3` but the actual
 value is `nil`.
 
-- [ ] **Step 3: Apply choices and rows together**
+- [x] **Step 3: Apply choices and rows together**
 
 Add this helper to `dockapps.lua` and use it from `show` and
 `refreshVisibleChooser`:
@@ -41,7 +41,7 @@ local function applyChoices(scopePid)
 end
 ```
 
-- [ ] **Step 4: Verify GREEN and regression tests**
+- [x] **Step 4: Verify GREEN and regression tests**
 
 Run:
 
