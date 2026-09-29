@@ -40,7 +40,7 @@ chooser:rows(math.max(1, math.min(#choices, maxVisibleRows)))
 Run both Lua tests and compile `dockapps.lua` with `luajit -b`. Expect all
 commands to exit zero.
 
-- [ ] **Step 5: Reload Hammerspoon**
+- [x] **Step 5: Reload Hammerspoon**
 
 Restart Hammerspoon and confirm `setup.lua completed` appears without a Lua
 configuration error.
