@@ -8,6 +8,8 @@ end
 
 local state = {
   alerts = {},
+  chooserDeletes = 0,
+  chooserNewCalls = 0,
   iconCalls = 0,
   windowsByID = {},
 }
@@ -46,13 +48,25 @@ local windows = {
   window(3, safari, "Docs", false),
 }
 
-local chooser = { visible = false }
-function chooser:choices(value) self.choiceList = value return self end
-function chooser:rows(value) self.rowCount = value return self end
-function chooser:query(value) self.queryValue = value return self end
-function chooser:show() self.visible = true return self end
-function chooser:isVisible() return self.visible end
-function chooser:searchSubText(value) self.searchesSubText = value return self end
+local chooser
+
+local function newChooser(callback)
+  local value = { visible = false, callback = callback }
+  function value:choices(choices) self.choiceList = choices return self end
+  function value:rows(rows) self.rowCount = rows return self end
+  function value:query(query) self.queryValue = query return self end
+  function value:show() self.visible = true return self end
+  function value:isVisible() return self.visible end
+  function value:searchSubText(enabled) self.searchesSubText = enabled return self end
+  function value:delete()
+    self.deleted = true
+    state.chooserDeletes = state.chooserDeletes + 1
+  end
+
+  state.chooserNewCalls = state.chooserNewCalls + 1
+  chooser = value
+  return value
+end
 
 local filter = {}
 function filter:setDefaultFilter(value) self.defaultFilter = value return self end
@@ -75,7 +89,7 @@ local hotkey = {}
 _G.hs = {
   alert = { show = function(message) state.alerts[#state.alerts + 1] = message end },
   application = { frontmostApplication = function() return iterm end },
-  chooser = { new = function(callback) chooser.callback = callback return chooser end },
+  chooser = { new = newChooser },
   eventtap = {
     event = { types = { flagsChanged = 1 } },
     new = function(_, callback) eventTap.callback = callback return eventTap end,
@@ -118,11 +132,14 @@ assertEqual(type(dockapps.showAll), "function", "module exports all-window actio
 assertEqual(type(dockapps.showCurrentApp), "function", "module exports current-app action")
 assertEqual(filter.sortOrder, "focusedLast", "filter uses MRU ordering")
 assertEqual(filter.defaultFilter.allowRoles[1], "AXStandardWindow", "standard windows are allowed")
-assertEqual(chooser.searchesSubText, true, "chooser searches window titles")
+assertEqual(state.chooserNewCalls, 0, "module loading does not allocate a chooser")
 assertEqual(eventTap.started, true, "modifier event tap starts")
 assertEqual(hotkey.key, "w", "current-app hotkey is registered")
 
 dockapps.showAll()
+assertEqual(state.chooserNewCalls, 1, "first opening allocates a chooser")
+assertEqual(dockapps.chooser, chooser, "module exports the active chooser")
+assertEqual(chooser.searchesSubText, true, "chooser searches window titles")
 assertEqual(#chooser.choiceList, 3, "all scope contains every known window")
 assertEqual(chooser.rowCount, 3, "all choices are shown without scrolling")
 assertEqual(chooser.choiceList[1].windowID, 2, "filter MRU order is retained")
@@ -135,7 +152,11 @@ filter.callback()
 assertEqual(chooser.rowCount, 2, "visible chooser resizes after a window-list refresh")
 
 chooser.visible = false
+local firstChooser = chooser
 dockapps.showCurrentApp()
+assertEqual(state.chooserNewCalls, 2, "second opening allocates a fresh chooser")
+assertEqual(firstChooser.deleted, true, "second opening deletes the old chooser")
+assertEqual(state.chooserDeletes, 1, "only the replaced chooser is deleted")
 assertEqual(#chooser.choiceList, 2, "current-app scope only contains front app windows")
 assertEqual(chooser.rowCount, 2, "current-app chooser shows every result")
 assertEqual(chooser.choiceList[1].windowID, 2, "current-app scope retains MRU order")
