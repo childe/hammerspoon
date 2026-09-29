@@ -20,4 +20,4 @@
 - [x] Run the integration test and observe the current implementation returning 11 rows.
 - [x] Change `maxVisibleRows` from 11 to 15.
 - [x] Run both tests and LuaJIT bytecode compilation.
-- [ ] Restart Hammerspoon and verify its Lua setup completes.
+- [x] Restart Hammerspoon and verify its Lua setup completes.
