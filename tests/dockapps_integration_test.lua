@@ -149,13 +149,13 @@ assertEqual(iterm.activatedAllWindows, false, "unselected application windows ar
 chooser.callback({ windowID = 999 })
 assertEqual(state.alerts[#state.alerts], "Window is no longer available", "stale selection is handled")
 
-for id = 1001, 1010 do
+for id = 1001, 1014 do
   windows[#windows + 1] = window(id, iterm, "extra-" .. id, false)
 end
 chooser.visible = false
 dockapps.showAll()
-assertEqual(#chooser.choiceList, 12, "all choices remain available above the visible-row cap")
-assertEqual(chooser.rowCount, 11, "chooser height is capped for a 1080-point display")
+assertEqual(#chooser.choiceList, 16, "all choices remain available above the visible-row cap")
+assertEqual(chooser.rowCount, 15, "chooser height uses the configured fifteen-row cap")
 
 local function flagsEvent(flags)
   return { getFlags = function() return flags end }

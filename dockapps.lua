@@ -2,7 +2,7 @@ local core = require("dockapps_core")
 
 local M = {}
 local wf = hs.window.filter
-local maxVisibleRows = 11
+local maxVisibleRows = 15
 local iconCache = {}
 local activeScopePid = nil
 local lastFlags = {}
