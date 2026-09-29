@@ -52,7 +52,7 @@ Run:
 
 Expected: both print `ok` and exit zero.
 
-- [ ] **Step 5: Reload Hammerspoon**
+- [x] **Step 5: Reload Hammerspoon**
 
 Restart Hammerspoon, confirm its process is running, and inspect startup logs
 for Lua errors.
