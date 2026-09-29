@@ -102,12 +102,18 @@ local function focusChoice(choice)
   end
 end
 
-chooser = hs.chooser.new(focusChoice)
-chooser:searchSubText(true)
+local function newChooser()
+  local value = hs.chooser.new(focusChoice)
+  value:searchSubText(true)
+  return value
+end
 
 local function show(scopePid)
   if safeCall(chooser, "isVisible") == true then return end
 
+  safeCall(chooser, "delete")
+  chooser = newChooser()
+  M.chooser = chooser
   activeScopePid = scopePid
   applyChoices(scopePid)
   chooser:query(nil)
