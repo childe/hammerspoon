@@ -159,7 +159,7 @@ local modifierTap = hs.eventtap.new({ hs.eventtap.event.types.flagsChanged }, fu
 end):start()
 
 -- A separate searchable list for windows belonging to the current application.
-local currentAppHotkey = hs.hotkey.bind({ "ctrl", "alt", "cmd" }, "w", M.showCurrentApp)
+local currentAppHotkey = hs.hotkey.bind({ "alt", "cmd" }, "o", M.showCurrentApp)
 
 -- Retain these Hammerspoon objects for the lifetime of the loaded module.
 M.windowFilter = windowFilter
