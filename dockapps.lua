@@ -33,6 +33,7 @@ local function windowRecord(window)
   local id = safeCall(window, "id")
   local application = safeCall(window, "application")
   if type(id) ~= "number" or application == nil then return nil end
+  if safeCall(application, "isRunning") == false then return nil end
 
   local appName = safeCall(application, "name")
   local pid = safeCall(application, "pid")

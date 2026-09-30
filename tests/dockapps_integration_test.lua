@@ -15,11 +15,12 @@ local state = {
 }
 
 local function app(name, pid, hidden)
-  local value = { activated = false }
+  local value = { activated = false, running = true }
   function value:name() return name end
   function value:pid() return pid end
   function value:path() return "/Applications/" .. name .. ".app" end
   function value:isHidden() return hidden end
+  function value:isRunning() return self.running end
   function value:activate(allWindows)
     self.activated = true
     self.activatedAllWindows = allWindows
@@ -185,5 +186,12 @@ chooser.visible = false
 eventTap.callback(flagsEvent({ cmd = true }))
 eventTap.callback(flagsEvent({ cmd = true, ctrl = true, fn = true }))
 assertEqual(chooser.visible, true, "Cmd then Cmd+Ctrl opens the chooser")
+
+local closedApp = app("Closed App", 300, false)
+windows[#windows + 1] = window(2001, closedApp, "stale", false)
+closedApp.running = false
+chooser.visible = false
+dockapps.showAll()
+assertEqual(#chooser.choiceList, 16, "terminated application windows are excluded")
 
 print("dockapps_integration_test: ok")
