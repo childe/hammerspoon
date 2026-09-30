@@ -134,7 +134,7 @@ assertEqual(filter.sortOrder, "focusedLast", "filter uses MRU ordering")
 assertEqual(filter.defaultFilter.allowRoles[1], "AXStandardWindow", "standard windows are allowed")
 assertEqual(state.chooserNewCalls, 0, "module loading does not allocate a chooser")
 assertEqual(eventTap.started, true, "modifier event tap starts")
-assertEqual(hotkey.key, "w", "current-app hotkey is registered")
+assertEqual(hotkey.key, "o", "current-app hotkey is registered")
 
 dockapps.showAll()
 assertEqual(state.chooserNewCalls, 1, "first opening allocates a chooser")
