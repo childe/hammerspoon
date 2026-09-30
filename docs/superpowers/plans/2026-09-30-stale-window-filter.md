@@ -15,7 +15,7 @@
 **Files:**
 - Modify: `tests/dockapps_integration_test.lua:137`
 
-- [ ] **Step 1: Match the test to the committed current-app shortcut**
+- [x] **Step 1: Match the test to the committed current-app shortcut**
 
 Change the stale key assertion to:
 
@@ -23,7 +23,7 @@ Change the stale key assertion to:
 assertEqual(hotkey.key, "o", "current-app hotkey is registered")
 ```
 
-- [ ] **Step 2: Run the integration test**
+- [x] **Step 2: Run the integration test**
 
 Run:
 
@@ -33,7 +33,7 @@ Run:
 
 Expected: `dockapps_integration_test: ok`.
 
-- [ ] **Step 3: Commit the baseline repair**
+- [x] **Step 3: Commit the baseline repair**
 
 ```bash
 git add tests/dockapps_integration_test.lua
@@ -46,7 +46,7 @@ git commit -m "test: align current app shortcut assertion"
 - Modify: `tests/dockapps_integration_test.lua`
 - Modify: `dockapps.lua:35-43`
 
-- [ ] **Step 1: Model application liveness in the fake**
+- [x] **Step 1: Model application liveness in the fake**
 
 Extend the fake application with a mutable running state:
 
@@ -67,7 +67,7 @@ local function app(name, pid, hidden)
 end
 ```
 
-- [ ] **Step 2: Add the failing regression case**
+- [x] **Step 2: Add the failing regression case**
 
 At the end of the integration test, append a cached window, terminate its fake
 owner, reopen the chooser, and verify that the row is absent:
@@ -81,7 +81,7 @@ dockapps.showAll()
 assertEqual(#chooser.choiceList, 16, "terminated application windows are excluded")
 ```
 
-- [ ] **Step 3: Run the test and verify RED**
+- [x] **Step 3: Run the test and verify RED**
 
 Run:
 
@@ -91,7 +91,7 @@ Run:
 
 Expected: FAIL with `terminated application windows are excluded: expected 16, got 17`.
 
-- [ ] **Step 4: Add the minimal liveness guard**
+- [x] **Step 4: Add the minimal liveness guard**
 
 Immediately after resolving the owning application in `windowRecord()` add:
 
@@ -102,7 +102,7 @@ if safeCall(application, "isRunning") == false then return nil end
 An unavailable or failing method produces `nil`, which intentionally keeps the
 record rather than hiding a potentially valid window.
 
-- [ ] **Step 5: Run the full Lua test suite and compile**
+- [x] **Step 5: Run the full Lua test suite and compile**
 
 Run:
 
@@ -116,12 +116,12 @@ git diff --check
 
 Expected: both tests print `ok`; compilation and whitespace checks exit 0.
 
-- [ ] **Step 6: Restart Hammerspoon and verify configuration load**
+- [x] **Step 6: Restart Hammerspoon and verify configuration load**
 
 Quit and reopen Hammerspoon, then inspect the unified log. Expected: a new
 `setup.lua completed` entry and no Lua configuration error.
 
-- [ ] **Step 7: Commit the fix**
+- [x] **Step 7: Commit the fix**
 
 ```bash
 git add dockapps.lua tests/dockapps_integration_test.lua docs/superpowers/plans/2026-09-30-stale-window-filter.md
