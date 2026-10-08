@@ -30,7 +30,7 @@ local function app(name, pid, hidden)
 end
 
 local function window(id, owner, title, minimized)
-  local value = { focused = false, unminimized = false }
+  local value = { focused = false, unminimized = false, alive = true }
   function value:id() return id end
   function value:application() return owner end
   function value:title() return title end
@@ -89,6 +89,11 @@ local hotkey = {}
 
 _G.hs = {
   alert = { show = function(message) state.alerts[#state.alerts + 1] = message end },
+  axuielement = {
+    windowElement = function(win)
+      return { isValid = function() return win.alive end }
+    end,
+  },
   application = { frontmostApplication = function() return iterm end },
   chooser = { new = newChooser },
   eventtap = {
@@ -193,5 +198,20 @@ closedApp.running = false
 chooser.visible = false
 dockapps.showAll()
 assertEqual(#chooser.choiceList, 16, "terminated application windows are excluded")
+
+local deadWindow = window(2002, iterm, nil, false)
+deadWindow.alive = false
+windows[#windows + 1] = deadWindow
+chooser.visible = false
+dockapps.showAll()
+assertEqual(#chooser.choiceList, 16, "destroyed windows of running applications are excluded")
+
+local offscreen = window(2003, iterm, "other space", false)
+windows[#windows + 1] = offscreen
+state.windowsByID[2003] = nil
+chooser.visible = false
+dockapps.showAll()
+chooser.callback({ windowID = 2003 })
+assertEqual(offscreen.focused, true, "selection focuses the listed window without hs.window.get")
 
 print("dockapps_integration_test: ok")

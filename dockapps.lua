@@ -29,11 +29,20 @@ local function appIcon(application)
   return iconCache[path] or nil
 end
 
+-- The window filter can keep windows whose AX element was destroyed without a
+-- notification; those report empty titles and cannot be found again by id.
+local function isWindowAlive(window)
+  local ok, element = pcall(hs.axuielement.windowElement, window)
+  if not ok or element == nil then return true end
+  return safeCall(element, "isValid") ~= false
+end
+
 local function windowRecord(window)
   local id = safeCall(window, "id")
   local application = safeCall(window, "application")
   if type(id) ~= "number" or application == nil then return nil end
   if safeCall(application, "isRunning") == false then return nil end
+  if not isWindowAlive(window) then return nil end
 
   local appName = safeCall(application, "name")
   local pid = safeCall(application, "pid")
@@ -57,6 +66,9 @@ local windowFilter = wf.new()
   :setSortOrder(wf.sortByFocusedLast)
 
 local chooser
+-- Window objects from the latest snapshot, keyed by id, so selection does not
+-- depend on hs.window.get rediscovering the window.
+local windowsByID = {}
 
 local function choicesFor(scopePid)
   local ok, windows = pcall(windowFilter.getWindows, windowFilter, wf.sortByFocusedLast)
@@ -66,9 +78,13 @@ local function choicesFor(scopePid)
   end
 
   local records = {}
+  windowsByID = {}
   for _, window in ipairs(windows) do
     local record = windowRecord(window)
-    if record ~= nil then records[#records + 1] = record end
+    if record ~= nil then
+      records[#records + 1] = record
+      windowsByID[record.id] = window
+    end
   end
 
   return core.buildChoices(records, scopePid)
@@ -83,8 +99,12 @@ end
 local function focusChoice(choice)
   if choice == nil or type(choice.windowID) ~= "number" then return end
 
-  local ok, window = pcall(hs.window.get, choice.windowID)
-  if not ok or window == nil then
+  local window = windowsByID[choice.windowID]
+  if window == nil then
+    local ok, found = pcall(hs.window.get, choice.windowID)
+    if ok then window = found end
+  end
+  if window == nil or not isWindowAlive(window) then
     hs.alert.show("Window is no longer available")
     return
   end
