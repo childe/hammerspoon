@@ -1,4 +1,5 @@
 require "dockapps"
+require "iterm_layout"
 require "window.window"
 require "clipboard.clipboard"
 --require "script.script"
