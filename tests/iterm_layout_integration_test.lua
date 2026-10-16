@@ -10,7 +10,7 @@ local function assertEqual(actual, expected, message)
   end
 end
 
-local state = { alerts = {}, windows = {}, subscriptions = {}, hotkeys = {}, debounceStarts = 0, screenWatchers = 0 }
+local state = { alerts = {}, windows = {}, subscriptions = {}, hotkeys = {} }
 
 local function screen(id, frame)
   local value = {}
@@ -58,21 +58,6 @@ hs = {
     rect = function(x, y, w, h) return { x = x, y = y, w = w, h = h } end,
     point = function(x, y) return { x = x, y = y } end,
   },
-  screen = {
-    watcher = {
-      new = function(fn)
-        state.screenWatcher = fn
-        return { start = function(self) state.screenWatchers = state.screenWatchers + 1 return self end }
-      end,
-    },
-  },
-  timer = {
-    delayed = {
-      new = function(seconds, fn)
-        return { seconds = seconds, start = function() state.debounceStarts = state.debounceStarts + 1 fn() end }
-      end,
-    },
-  },
   alert = { show = function(message) state.alerts[#state.alerts + 1] = message end },
   hotkey = {
     bind = function(mods, key, fn)
@@ -85,16 +70,14 @@ hs = {
 local main = screen(1, { x = 0, y = 25, w = 1728, h = 1080 })
 local side = screen(2, { x = 1728, y = 0, w = 1920, h = 1200 })
 
--- Windows that exist before the config loads are arranged right away.
+-- Loading the config must not touch existing windows: layout is manual only.
 local pre1 = window(11, main, { x = 0, y = 25, w = 1728, h = 1080 })
 local pre2 = window(12, main, { x = 0, y = 25, w = 1728, h = 1080 })
 state.windows = { pre1, pre2 }
 
 local layout = require("iterm_layout")
-assertEqual(state.debounceStarts, 1, "layout is scheduled on load")
-assertEqual(state.screenWatchers, 1, "screen changes are watched")
-assertEqual(pre1:frame().w, 1728 - layout.margin, "pre-existing window resized on load")
-assertEqual(pre1:frame().x ~= pre2:frame().x, true, "pre-existing windows no longer overlap fully")
+assertEqual(next(state.subscriptions), nil, "no window events are subscribed")
+assertEqual(pre1.setCalls + pre2.setCalls, 0, "loading the config moves nothing")
 assertEqual(filter.appName, "iTerm2", "filter targets iTerm2")
 assertEqual(filter.options.visible, true, "only visible windows are laid out")
 assertEqual(filter.options.fullscreen, false, "fullscreen windows are ignored")
@@ -123,8 +106,7 @@ local a = window(1, main, { x = 100, y = 100, w = 800, h = 600 })
 local b = window(2, main, { x = 900, y = 100, w = 800, h = 600 })
 local c = window(3, main, { x = 500, y = 500, w = 800, h = 600 })
 state.windows = { a, b, c }
-state.subscriptions.windowsChanged()
-assertEqual(state.debounceStarts, 2, "windowsChanged goes through the debounce timer")
+layout.layout()
 assertLaidOut({ a, b, c }, main, "three windows")
 assertEqual(a.lastDuration, 0, "frames are set without animation")
 
@@ -139,7 +121,7 @@ local placed = {}
 for _, w in ipairs({ a, b, c }) do placed[w] = w.setCalls end
 local d = window(4, main, { x = 10, y = 10, w = 300, h = 300 })
 state.windows = { a, b, c, d }
-state.subscriptions.windowsChanged()
+layout.layout()
 assertLaidOut({ a, b, c, d }, main, "four windows")
 local untouched = 0
 for _, w in ipairs({ a, b, c }) do
@@ -153,7 +135,7 @@ local panel = window(5, main, { x = 0, y = 0, w = 100, h = 100 })
 panel.standard = false
 local e = window(6, side, { x = 1800, y = 50, w = 700, h = 500 })
 state.windows = { a, b, c, d, panel, e }
-state.subscriptions.windowsChanged()
+layout.layout()
 assertLaidOut({ a, b, c }, main, "stale window dropped")
 assertLaidOut({ e }, side, "second screen laid out on its own")
 assertEqual(panel.setCalls, 0, "non-standard window untouched")
@@ -162,18 +144,14 @@ assertEqual(panel.setCalls, 0, "non-standard window untouched")
 local bFrame, cFrame = b:frame(), c:frame()
 local f = window(7, main, { x = bFrame.x, y = bFrame.y, w = bFrame.w, h = bFrame.h })
 state.windows = { a, b, c, f, e }
-state.subscriptions.windowsChanged()
+layout.layout()
 assertEqual(b:frame().x == bFrame.x and b:frame().y == bFrame.y, true, "existing window b keeps its place")
 assertEqual(c:frame().x == cFrame.x and c:frame().y == cFrame.y, true, "existing window c keeps its place")
 assertLaidOut({ a, b, c, f }, main, "newcomer squeezed in")
 
--- Dragging a window to the other screen re-lays out both screens.
-local starts = state.debounceStarts
-state.subscriptions.windowMoved(a)
-assertEqual(state.debounceStarts, starts, "moving within a screen does nothing")
+-- After dragging a window to the other screen, a layout arranges both screens.
 a.onScreen = side
-state.subscriptions.windowMoved(a)
-assertEqual(state.debounceStarts, starts + 1, "moving to another screen re-lays out")
+layout.layout()
 assertLaidOut({ b, c, f }, main, "main screen after move")
 assertLaidOut({ a, e }, side, "side screen after move")
 
@@ -181,7 +159,7 @@ assertLaidOut({ a, e }, side, "side screen after move")
 local g = window(8, side, { x = 1800, y = 50, w = 300, h = 300 })
 g.snap = 7
 state.windows = { a, b, c, f, e, g }
-state.subscriptions.windowsChanged()
+layout.layout()
 assertLaidOut({ a, e, g }, side, "snapped window still fits its slot")
 local sf = side:frame()
 local flush = 0
@@ -190,13 +168,9 @@ for _, w in ipairs({ a, e, g }) do
 end
 assertEqual(flush >= 2, true, "right-anchored slots stay flush right")
 local before4 = g.setCalls
-state.subscriptions.windowsChanged()
+layout.layout()
 assertEqual(g.setCalls, before4, "snapped window is not resized again")
 
--- Screen setup change triggers a layout.
-starts = state.debounceStarts
-state.screenWatcher()
-assertEqual(state.debounceStarts, starts + 1, "screen change re-lays out")
 
 -- Reviewer regression: a small screen with clamped cascade steps (25x18) and a
 -- window that snaps by exactly one step. It must still be clickable.
@@ -208,7 +182,7 @@ local crowd = {}
 for i = 1, 9 do crowd[i] = window(100 + i, tiny, { x = 5000, y = 0, w = 400, h = 300 }) end
 crowd[2].snapX, crowd[2].snapY = 25, 18
 state.windows = crowd
-state.subscriptions.windowsChanged()
+layout.layout()
 print = realPrint
 local actual = {}
 for i, w in ipairs(crowd) do actual[i] = w:frame() end
@@ -218,7 +192,7 @@ assertLaidOut(crowd, tiny, "crowded small screen")
 assertEqual(crowd[2]:frame().x + crowd[2]:frame().w, 5000 + 25 + 200, "snapped window pinned to its slot's right edge")
 
 -- The manual hotkey always gives feedback, even when nothing has to move.
-assertEqual(#state.alerts, 0, "automatic layouts stay silent")
+assertEqual(#state.alerts, 0, "layout() itself stays silent; only the hotkey alerts")
 state.hotkeys[1].fn()
 assertEqual(state.alerts[1], "iTerm 布局：9 个窗口，移动 0 个", "hotkey reports a no-op layout")
 crowd[5].frameValue = { x = 5000, y = 0, w = 100, h = 100 }

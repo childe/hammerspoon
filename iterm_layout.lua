@@ -1,17 +1,16 @@
 -- Keep iTerm2 windows as large as possible while every window keeps a region
 -- no other window covers, so any window is always one click away.
--- Re-lays out on load, when windows appear/disappear, move to another screen, or
--- the screen setup changes; Cmd+Alt+Ctrl+T forces it.
+-- Only runs on demand (Cmd+Alt+Ctrl+T); nothing is rearranged automatically.
 local core = require("iterm_layout_core")
 
 local M = {}
 local appName = "iTerm2"
 M.margin = 60
-M.debounceSeconds = 0.3
 -- How much smaller than its slot a window may be and still count as in place
 -- (iTerm2 snaps windows to its character grid). Clickability never depends on it.
 M.snapTolerance = 40
--- Window id -> screen id from the last layout; also the set of known windows.
+-- Window id -> screen id from the last layout: windows seen there keep their
+-- slots ahead of windows opened since.
 local lastScreen = {}
 
 local function safeCall(object, methodName, ...)
@@ -108,33 +107,12 @@ local windowFilter = hs.window.filter.new(false):setAppFilter(appName, {
   fullscreen = false,
 })
 
-local debounce = hs.timer.delayed.new(M.debounceSeconds, function()
-  layoutWindows(windowFilter)
-end)
-
 function M.layout()
   return layoutWindows(windowFilter)
 end
 
-windowFilter:subscribe(hs.window.filter.windowsChanged, function()
-  debounce:start()
-end)
-
--- Moving a window to another screen keeps the filtered set unchanged, so watch
--- moves and only react to screen changes (our own setFrame never changes screen).
-windowFilter:subscribe(hs.window.filter.windowMoved, function(window)
-  local id = safeCall(window, "id")
-  local screen = safeCall(window, "screen")
-  if id == nil or screen == nil then return end
-  if lastScreen[id] ~= nil and lastScreen[id] ~= screen:id() then
-    debounce:start()
-  end
-end)
-
-local screenWatcher = hs.screen.watcher.new(function() debounce:start() end):start()
-
--- Manual trigger always gives feedback: when the windows are already in place
--- nothing moves, which would otherwise look like the hotkey did nothing.
+-- Always gives feedback: when the windows are already in place nothing moves,
+-- which would otherwise look like the hotkey did nothing.
 local hotkey = hs.hotkey.bind({ "cmd", "alt", "ctrl" }, "T", function()
   local total, moved = M.layout()
   if total == 0 then
@@ -144,12 +122,7 @@ local hotkey = hs.hotkey.bind({ "cmd", "alt", "ctrl" }, "T", function()
   end
 end)
 
--- Arrange windows that already exist when the config loads.
-debounce:start()
-
 M.windowFilter = windowFilter
-M.debounce = debounce
-M.screenWatcher = screenWatcher
 M.hotkey = hotkey
 
 return M
