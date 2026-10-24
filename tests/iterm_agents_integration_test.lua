@@ -48,11 +48,11 @@ hs = {
 }
 
 state.psOutput = table.concat({
-  "100 1 ttys001 /usr/bin/login",
-  "101 100 ttys001 -zsh",
-  "102 101 ttys001 claude",
-  "200 1 ttys002 /usr/bin/login",
-  "201 200 ttys002 -zsh",
+  "100 1 01:00 ttys001 /usr/bin/login",
+  "101 100 01:00 ttys001 -zsh",
+  "102 101 00:30 ttys001 claude",
+  "200 1 01:00 ttys002 /usr/bin/login",
+  "201 200 01:00 ttys002 -zsh",
 }, "\n")
 local longTitle = string.rep("长", 100)
 state.listOutput = table.concat({

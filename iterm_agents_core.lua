@@ -8,13 +8,24 @@ local function lines(text)
   return (text or ""):gmatch("[^\n]+")
 end
 
--- Parses `ps -A -o pid=,ppid=,tty=,comm=` output into {pid, ppid, tty, comm}.
+-- Converts ps etime, [[dd-]hh:]mm:ss, to seconds.
+local function parseElapsed(etime)
+  local days, rest = etime:match("^(%d+)-(.+)$")
+  local seconds = 0
+  for part in (rest or etime):gmatch("%d+") do seconds = seconds * 60 + tonumber(part) end
+  return seconds + (tonumber(days) or 0) * 86400
+end
+
+-- Parses `ps -A -o pid=,ppid=,etime=,tty=,comm=` output into
+-- {pid, ppid, elapsed, tty, comm}, elapsed being seconds since the process started.
 function M.parseProcesses(text)
   local procs = {}
   for line in lines(text) do
-    local pid, ppid, tty, comm = line:match("^%s*(%d+)%s+(%d+)%s+(%S+)%s+(.-)%s*$")
+    local pid, ppid, etime, tty, comm = line:match("^%s*(%d+)%s+(%d+)%s+([%d:-]+)%s+(%S+)%s+(.-)%s*$")
     if pid then
-      procs[#procs + 1] = { pid = tonumber(pid), ppid = tonumber(ppid), tty = tty, comm = comm }
+      procs[#procs + 1] = {
+        pid = tonumber(pid), ppid = tonumber(ppid), elapsed = parseElapsed(etime), tty = tty, comm = comm,
+      }
     end
   end
   return procs
@@ -39,7 +50,7 @@ local function agentName(comm)
   return nil
 end
 
--- Returns the agent running under the session's tty, or nil. Walks descendants
+-- Returns the agent running under the session's tty and its process, or nil. Walks descendants
 -- rather than matching the tty, since wrappers like kiro-cli-term run the real
 -- programs on an inner pty.
 function M.agentOnTty(procs, tty)
@@ -57,21 +68,28 @@ function M.agentOnTty(procs, tty)
     if not visited[p.pid] then
       visited[p.pid] = true
       local agent = agentName(p.comm)
-      if agent then return agent end
+      if agent then return agent, p end
       for _, child in ipairs(children[p.pid] or {}) do frontier[#frontier + 1] = child end
     end
   end
   return nil
 end
 
--- Tags each session with its agent and returns agent sessions first, otherwise
--- keeping iTerm2's window/tab order.
+-- Tags each session with its agent and returns agent sessions first, the most
+-- recently started agent on top; other sessions keep iTerm2's window/tab order.
 function M.classify(sessions, procs)
-  local agents, others = {}, {}
-  for _, s in ipairs(sessions) do
-    s.agent = M.agentOnTty(procs, s.tty)
+  local agents, others, elapsed, order = {}, {}, {}, {}
+  for i, s in ipairs(sessions) do
+    local agent, proc = M.agentOnTty(procs, s.tty)
+    s.agent = agent
+    elapsed[s], order[s] = proc and proc.elapsed, i
     table.insert(s.agent and agents or others, s)
   end
+  -- table.sort is not stable, so ties fall back to iTerm2's order.
+  table.sort(agents, function(a, b)
+    if elapsed[a] ~= elapsed[b] then return elapsed[a] < elapsed[b] end
+    return order[a] < order[b]
+  end)
   for _, s in ipairs(others) do agents[#agents + 1] = s end
   return agents
 end
