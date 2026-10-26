@@ -26,7 +26,7 @@ utf8 = utf8 or {
   end,
 }
 
-local state = { running = true, scripts = {}, alerts = {}, focusResult = true }
+local state = { running = true, scripts = {}, alerts = {}, commands = {}, focusResult = true }
 
 local menubar = {}
 function menubar:setTitle(t) self.title = t end
@@ -42,7 +42,11 @@ hs = {
       return true, state.focusResult
     end,
   },
-  execute = function() return state.psOutput end,
+  execute = function(cmd)
+    table.insert(state.commands, cmd)
+    if cmd:find("^lsof") then return state.lsofOutput end
+    return state.psOutput
+  end,
   menubar = { new = function() return menubar end },
   alert = { show = function(text) table.insert(state.alerts, text) end },
 }
@@ -80,6 +84,21 @@ assertEqual(state.alerts[1], "iTerm tab 已关闭", "alert when the session is g
 
 assertEqual(agents.focus('x" & do shell script "rm'), false, "rejects unsafe session ids")
 
+-- Agent tabs are grouped by directory, newest first within one.
+state.psOutput = table.concat({
+  "100 1 01:00 ttys001 claude",
+  "200 1 02:00 ttys002 codex",
+  "300 1 03:00 ttys003 claude",
+}, "\n")
+state.lsofOutput = "p100\nfcwd\nn/b\np200\nfcwd\nn/a\np300\nfcwd\nn/b\n"
+state.listOutput = "1\t1\tX\t/dev/ttys001\tx\n1\t2\tY\t/dev/ttys002\ty\n1\t3\tZ\t/dev/ttys003\tz\n"
+items = menubar.menuFn()
+assertEqual(state.commands[#state.commands], "lsof -a -d cwd -Fn -p 100,200,300", "asks lsof for agent cwds")
+assertEqual(items[1].title, "[codex] y", "directory /a first")
+assertEqual(items[2].title, "[claude] x", "newest agent in /b next")
+assertEqual(items[3].title, "[claude] z", "older agent in /b last")
+
+state.psOutput = "100 1 01:00 ttys001 claude\n"
 state.listOutput = "1\t1\tB\t/dev/ttys001\tonly agent\n"
 items = menubar.menuFn()
 assertEqual(#items, 1, "no separator without other tabs")

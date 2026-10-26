@@ -75,18 +75,42 @@ function M.agentOnTty(procs, tty)
   return nil
 end
 
--- Tags each session with its agent and returns agent sessions first, the most
--- recently started agent on top; other sessions keep iTerm2's window/tab order.
-function M.classify(sessions, procs)
-  local agents, others, elapsed, order = {}, {}, {}, {}
+-- Parses `lsof -a -d cwd -p <pids> -Fn` output into {pid = cwd}.
+function M.parseCwds(text)
+  local cwds, pid = {}, nil
+  for line in lines(text) do
+    local field, value = line:sub(1, 1), line:sub(2)
+    if field == "p" then
+      pid = tonumber(value)
+    elseif field == "n" and pid then
+      cwds[pid] = value
+    end
+  end
+  return cwds
+end
+
+-- Tags each session with its agent and returns agent sessions first, ordered by
+-- the agent's working directory, then the most recently started agent on top;
+-- agents with an unknown cwd follow. Other sessions keep iTerm2's window/tab order.
+-- cwdsFor(pids) returns {pid = cwd} for the agent processes.
+function M.classify(sessions, procs, cwdsFor)
+  local agents, others, elapsed, order, pids = {}, {}, {}, {}, {}
+  local procOf = {}
   for i, s in ipairs(sessions) do
     local agent, proc = M.agentOnTty(procs, s.tty)
     s.agent = agent
-    elapsed[s], order[s] = proc and proc.elapsed, i
+    elapsed[s], order[s], procOf[s] = proc and proc.elapsed, i, proc
+    if proc then pids[#pids + 1] = proc.pid end
     table.insert(s.agent and agents or others, s)
   end
+  local cwds = (cwdsFor and #pids > 0) and cwdsFor(pids) or {}
+  for _, s in ipairs(agents) do s.cwd = cwds[procOf[s].pid] end
   -- table.sort is not stable, so ties fall back to iTerm2's order.
   table.sort(agents, function(a, b)
+    if a.cwd ~= b.cwd then
+      if a.cwd == nil or b.cwd == nil then return b.cwd == nil end
+      return a.cwd < b.cwd
+    end
     if elapsed[a] ~= elapsed[b] then return elapsed[a] < elapsed[b] end
     return order[a] < order[b]
   end)

@@ -1,4 +1,5 @@
--- Menubar list of iTerm2 tabs, with tabs running claude/codex on top, newest first.
+-- Menubar list of iTerm2 tabs, with tabs running claude/codex on top, grouped by
+-- the agent's directory and newest first within one.
 -- The list is built when the menu opens; picking an item focuses that session.
 local core = require("iterm_agents_core")
 
@@ -48,12 +49,16 @@ local function isRunning()
   return hs.application.get(appName) ~= nil
 end
 
+local function cwdsFor(pids)
+  return core.parseCwds(hs.execute("lsof -a -d cwd -Fn -p " .. table.concat(pids, ",")))
+end
+
 function M.sessions()
   if not isRunning() then return {} end
   local ok, output = hs.osascript.applescript(listScript)
   if not ok then return {} end
   local procs = core.parseProcesses(hs.execute("ps -A -o pid=,ppid=,etime=,tty=,comm="))
-  return core.classify(core.parseSessions(output), procs)
+  return core.classify(core.parseSessions(output), procs, cwdsFor)
 end
 
 function M.focus(sessionId)
