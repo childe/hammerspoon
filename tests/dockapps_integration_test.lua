@@ -11,11 +11,12 @@ local state = {
   chooserDeletes = 0,
   chooserNewCalls = 0,
   iconCalls = 0,
+  probeTimeouts = {},
   windowsByID = {},
 }
 
 local function app(name, pid, hidden)
-  local value = { activated = false, running = true }
+  local value = { activated = false, running = true, responding = true }
   function value:name() return name end
   function value:pid() return pid end
   function value:path() return "/Applications/" .. name .. ".app" end
@@ -90,6 +91,16 @@ local hotkey = {}
 _G.hs = {
   alert = { show = function(message) state.alerts[#state.alerts + 1] = message end },
   axuielement = {
+    applicationElement = function(owner)
+      local element = {}
+      function element:setTimeout(seconds) self.timeout = seconds return self end
+      function element:attributeValue(name)
+        state.probeTimeouts[#state.probeTimeouts + 1] = self.timeout
+        if name == "AXRole" and owner.responding then return "AXApplication" end
+        return nil
+      end
+      return element
+    end,
     windowElement = function(win)
       return { isValid = function() return win.alive end }
     end,
@@ -213,5 +224,18 @@ chooser.visible = false
 dockapps.showAll()
 chooser.callback({ windowID = 2003 })
 assertEqual(offscreen.focused, true, "selection focuses the listed window without hs.window.get")
+
+local hungApp = app("Hung App", 400, false)
+local hungWindow = window(2004, hungApp, "hung", false)
+function hungWindow:title() error("hung application windows must not be queried") end
+windows[#windows + 1] = hungWindow
+hungApp.responding = false
+chooser.visible = false
+dockapps.showAll()
+assertEqual(#chooser.choiceList, 17, "windows of applications that do not respond are excluded")
+for _, choice in ipairs(chooser.choiceList) do
+  assertEqual(choice.windowID ~= 2004, true, "hung application window is not listed")
+end
+assertEqual(state.probeTimeouts[#state.probeTimeouts] <= 0.2, true, "responsiveness probe uses a short timeout")
 
 print("dockapps_integration_test: ok")

@@ -37,18 +37,32 @@ local function isWindowAlive(window)
   return safeCall(element, "isValid") ~= false
 end
 
-local function windowRecord(window)
+-- A hung application (e.g. Activity Monitor stuck at 100% CPU) makes every AX
+-- call on its windows wait for the global AX timeout (~1.5s each), which froze
+-- the chooser for seconds. Probe it once with a short timeout and skip it.
+local probeTimeout = 0.1
+
+local function isResponding(application)
+  local ok, element = pcall(hs.axuielement.applicationElement, application)
+  if not ok or element == nil then return true end
+  safeCall(element, "setTimeout", probeTimeout)
+  return safeCall(element, "attributeValue", "AXRole") ~= nil
+end
+
+local function windowRecord(window, responding)
   local id = safeCall(window, "id")
   local application = safeCall(window, "application")
   if type(id) ~= "number" or application == nil then return nil end
   if safeCall(application, "isRunning") == false then return nil end
+
+  local pid = safeCall(application, "pid")
+  if type(pid) ~= "number" then return nil end
+  if responding[pid] == nil then responding[pid] = isResponding(application) end
+  if not responding[pid] then return nil end
   if not isWindowAlive(window) then return nil end
 
   local appName = safeCall(application, "name")
-  local pid = safeCall(application, "pid")
-  if type(appName) ~= "string" or appName == "" or type(pid) ~= "number" then
-    return nil
-  end
+  if type(appName) ~= "string" or appName == "" then return nil end
 
   return {
     id = id,
@@ -78,9 +92,11 @@ local function choicesFor(scopePid)
   end
 
   local records = {}
+  -- pid -> whether the application answers AX requests, probed once per snapshot.
+  local responding = {}
   windowsByID = {}
   for _, window in ipairs(windows) do
-    local record = windowRecord(window)
+    local record = windowRecord(window, responding)
     if record ~= nil then
       records[#records + 1] = record
       windowsByID[record.id] = window
