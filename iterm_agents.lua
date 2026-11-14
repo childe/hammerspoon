@@ -61,6 +61,44 @@ function M.sessions()
   return core.classify(core.parseSessions(output), procs, cwdsFor)
 end
 
+-- Tasks in flight; hs.task objects that nothing references can be collected before they finish.
+local tasks = {}
+
+-- Runs a program without blocking Hammerspoon and calls done(stdout, exitCode).
+local function run(path, args, done)
+  local task
+  task = hs.task.new(path, function(code, out)
+    tasks[task] = nil
+    done(out, code)
+  end, args)
+  tasks[task] = true
+  task:start()
+end
+
+-- Same result as sessions(), delivered to callback(sessions) without blocking the main thread:
+-- the synchronous osascript + ps + lsof take about 0.4s, too long to run every 2 seconds.
+function M.sessionsAsync(callback)
+  if not isRunning() then return callback({}) end
+  run("/usr/bin/osascript", { "-e", listScript }, function(listOut, code)
+    if code ~= 0 then return callback({}) end
+    run("/bin/ps", { "-A", "-o", "pid=,ppid=,etime=,tty=,comm=" }, function(psOut, psCode)
+      if psCode ~= 0 then return callback({}) end
+      local procs = core.parseProcesses(psOut)
+      local pids
+      core.classify(core.parseSessions(listOut), procs, function(p)
+        pids = p
+        return {}
+      end)
+      if not pids then return callback(core.classify(core.parseSessions(listOut), procs)) end
+      -- lsof exits 1 when one of the pids is gone; the rest of its output is still good.
+      run("/usr/sbin/lsof", { "-a", "-d", "cwd", "-Fn", "-p", table.concat(pids, ",") }, function(lsofOut)
+        local cwds = core.parseCwds(lsofOut)
+        callback(core.classify(core.parseSessions(listOut), procs, function() return cwds end))
+      end)
+    end)
+  end)
+end
+
 function M.focus(sessionId)
   -- Session ids are UUIDs; reject anything that could break out of the string.
   if not sessionId:match("^[%w%-:]+$") then return false end
