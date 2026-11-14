@@ -130,7 +130,8 @@ function M.state(title)
   return "w"
 end
 
--- Drops the leading status character and iTerm2's trailing " (job) — path".
+-- Drops the leading status character and iTerm2's trailing " (job) — path"; iTerm2 puts
+-- non-breaking spaces (U+00A0, bytes C2 A0) around the dash, so either kind of space matches.
 function M.cleanTitle(title)
   title = title or ""
   local b1 = title:byte(1)
@@ -138,7 +139,7 @@ function M.cleanTitle(title)
     local first = title:sub(1, 3)
     if M.state(first) == "r" or first == "✳" then title = title:sub(4):gsub("^ ", "") end
   end
-  return (title:gsub(" %([^()]*%) — .*$", ""))
+  return (title:gsub(" %([^()]*%)[ \194\160]+—[ \194\160].*$", ""))
 end
 
 -- Longest S line the Cardputer is sent: macOS's usual 185-byte MTU minus the 3-byte ATT header,

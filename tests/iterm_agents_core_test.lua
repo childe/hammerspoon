@@ -117,6 +117,9 @@ assertEqual(core.cleanTitle("⠸ 提供项目卡供选择 | stackm5 (codex) — 
 assertEqual(core.cleanTitle("Respond to greeting | stackm5 (codex) — ~/Projects/stackm5"),
   "Respond to greeting | stackm5", "codex idle title has no status character")
 assertEqual(core.cleanTitle("◑ a (b) c (caffeinate) — ~/x"), "a (b) c", "only the last (job) suffix is dropped")
+-- Real iTerm2 titles put non-breaking spaces (U+00A0) around the em dash.
+assertEqual(core.cleanTitle("✳ 使用场景 (claude)\194\160—\194\160~/Projects/osg"), "使用场景",
+  "suffix with non-breaking spaces dropped")
 
 -- encodeList: one B, an S line per agent session in input order, one E.
 local lines = core.encodeList({
