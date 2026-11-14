@@ -50,15 +50,34 @@ hs = {
   menubar = { new = function() return menubar end },
   alert = { show = function(text) table.insert(state.alerts, text) end },
   -- Runs the command synchronously on start() with canned output picked by program path.
+  -- Like the real hs.task, a task whose stdout pipe gets more than the 64KB pipe buffer never
+  -- finishes: the program blocks writing because stdout is not drained until exit.
+  -- `/bin/sh -c 'out="$1"; shift; "$@" > "$out"' sh <file> <program> <args...>` is understood:
+  -- the canned output goes to <file> instead of the pipe.
   task = {
     new = function(path, callback, args)
       local t = { path = path, args = args }
+      local program, file = path, nil
+      if path == "/bin/sh" and args[1] == "-c" then
+        file, program = args[4], args[5]
+        t.program = program
+        t.programArgs = {}
+        for i = 6, #args do t.programArgs[#t.programArgs + 1] = args[i] end
+      end
       table.insert(state.tasks, t)
       function t:start()
         local out = state.psOutput
-        if path:find("osascript$") then out = state.listOutput end
-        if path:find("lsof$") then out = state.lsofOutput end
-        callback(0, out, "")
+        if program:find("osascript$") then out = state.listOutput end
+        if program:find("lsof$") then out = state.lsofOutput end
+        out = out or ""
+        if file then
+          local f = assert(io.open(file, "w"))
+          f:write(out)
+          f:close()
+          callback(0, "", "")
+        elseif #out <= 65536 then
+          callback(0, out, "")
+        end
         return self
       end
       return t
@@ -139,8 +158,18 @@ assertEqual(ids(asyncResult), ids(agents.sessions()), "async order matches sync"
 assertEqual(ids(asyncResult), "Y,X,Z,W", "async groups agents by directory, others last")
 assertEqual(asyncResult[1].cwd, "/a", "async records cwd")
 local lsofTask = state.tasks[#state.tasks]
-assertEqual(lsofTask.path, "/usr/sbin/lsof", "lsof runs as a task")
-assertEqual(table.concat(lsofTask.args, " "), "-a -d cwd -Fn -p 100,200,300", "lsof asked for agent pids only")
+assertEqual(lsofTask.program, "/usr/sbin/lsof", "lsof runs as a task")
+assertEqual(table.concat(lsofTask.programArgs, " "), "-a -d cwd -Fn -p 100,200,300", "lsof asked for agent pids only")
+
+-- ps output on a busy Mac is larger than the pipe buffer (68KB measured).
+local psLines = { state.psOutput }
+for i = 1, 2000 do psLines[#psLines + 1] = string.format("%d 1 01:00 ?? /usr/libexec/some-daemon", 10000 + i) end
+state.psOutput = table.concat(psLines, "\n")
+assert(#state.psOutput > 65536, "test ps output exceeds the pipe buffer")
+asyncResult = nil
+agents.sessionsAsync(function(list) asyncResult = list end)
+assert(asyncResult, "async finishes when ps output exceeds the pipe buffer")
+assertEqual(ids(asyncResult):sub(1, 7), "Y,X,Z,W", "large ps output parsed")
 
 state.running = false
 local tasksBefore = #state.tasks

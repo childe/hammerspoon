@@ -65,12 +65,22 @@ end
 local tasks = {}
 
 -- Runs a program without blocking Hammerspoon and calls done(stdout, exitCode).
+-- The program's stdout goes to a temp file, read after it exits: hs.task does not drain a
+-- stdout pipe until the program exits, so output over the 64KB pipe buffer (ps -A is ~68KB
+-- on a busy Mac) blocks the program forever.
 local function run(path, args, done)
+  local file = os.tmpname()
+  local shArgs = { "-c", 'out="$1"; shift; "$@" > "$out"', "sh", file, path }
+  for _, a in ipairs(args) do shArgs[#shArgs + 1] = a end
   local task
-  task = hs.task.new(path, function(code, out)
+  task = hs.task.new("/bin/sh", function(code)
     tasks[task] = nil
+    local f = io.open(file)
+    local out = f and f:read("*a") or ""
+    if f then f:close() end
+    os.remove(file)
     done(out, code)
-  end, args)
+  end, shArgs)
   tasks[task] = true
   task:start()
 end
