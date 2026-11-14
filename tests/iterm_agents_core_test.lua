@@ -100,4 +100,43 @@ assertEqual(classified[1].id, "S-A", "known cwd first")
 assertEqual(classified[2].id, "S-D", "unknown cwd ordered by start time")
 assertEqual(classified[3].id, "S-C", "oldest unknown cwd last")
 
+-- state: a spinner as the title's first character means the agent is running.
+-- claude spins ◐◑◒◓ (U+25D0–25D3), codex spins braille dots (U+2800–28FF).
+for _, title in ipairs({ "◐ x", "◓ x", "⠸ x", "⣿ x" }) do
+  assertEqual(core.state(title), "r", "running: " .. title)
+end
+for _, title in ipairs({ "✳ x", "Respond to greeting | stackm5", "" }) do
+  assertEqual(core.state(title), "w", "waiting: " .. title)
+end
+
+-- cleanTitle drops the status character and iTerm2's " (job) — path" suffix.
+assertEqual(core.cleanTitle("✳ 电路图项目增加题目 (claude) — ~/Projects/saisai.me"), "电路图项目增加题目",
+  "claude title cleaned")
+assertEqual(core.cleanTitle("⠸ 提供项目卡供选择 | stackm5 (codex) — ~/Projects/stackm5"),
+  "提供项目卡供选择 | stackm5", "codex running title cleaned")
+assertEqual(core.cleanTitle("Respond to greeting | stackm5 (codex) — ~/Projects/stackm5"),
+  "Respond to greeting | stackm5", "codex idle title has no status character")
+assertEqual(core.cleanTitle("◑ a (b) c (caffeinate) — ~/x"), "a (b) c", "only the last (job) suffix is dropped")
+
+-- encodeList: one B, an S line per agent session in input order, one E.
+local lines = core.encodeList({
+  { id = "id1", agent = "claude", title = "◐ T1 (claude) — ~/p", cwd = "/Users/u/p" },
+  { id = "id9", agent = nil, title = "zsh" },
+  { id = "id2", agent = "codex", title = "T2\tx\ny (codex) — /tmp", cwd = nil },
+}, "/Users/u")
+assertEqual(#lines, 4, "B + two agents + E")
+assertEqual(lines[1], "B", "list starts with B")
+assertEqual(lines[2], "S\tid1\tc\tr\tT1\t~/p", "claude session encoded")
+assertEqual(lines[3], "S\tid2\tx\tw\tT2 x y\t", "tab and newline become spaces, unknown cwd empty")
+assertEqual(lines[4], "E", "list ends with E")
+
+-- encodeList truncates long titles on a UTF-8 character boundary.
+local long = core.encodeList({ { id = "id1", agent = "claude", title = string.rep("汉", 100), cwd = "/Users/u" } },
+  "/Users/u")[2]
+assert(#long <= 180, "S line is at most 180 bytes, got " .. #long)
+local title = long:match("^S\tid1\tc\tw\t(.-)\t~$")
+assert(title, "S line keeps its trailing dir field")
+assertEqual(#title % 3, 0, "title cut between whole 3-byte characters")
+assertEqual(title:sub(1, 3), "汉", "title keeps leading characters")
+
 print("iterm_agents_core tests passed")

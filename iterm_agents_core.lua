@@ -118,4 +118,63 @@ function M.classify(sessions, procs, cwdsFor)
   return agents
 end
 
+-- Returns "r" when the title starts with a spinner (the agent is running), "w" otherwise
+-- (its turn is over: done, or waiting for input or a permission answer).
+-- claude spins ◐◑◒◓ (U+25D0–25D3), codex spins braille dots (U+2800–28FF).
+-- Matches bytes rather than using utf8, which luajit lacks.
+function M.state(title)
+  local b1, b2, b3 = (title or ""):byte(1, 3)
+  if b1 ~= 0xE2 then return "w" end
+  if b2 == 0x97 and b3 >= 0x90 and b3 <= 0x93 then return "r" end
+  if b2 and b2 >= 0xA0 and b2 <= 0xA3 then return "r" end
+  return "w"
+end
+
+-- Drops the leading status character and iTerm2's trailing " (job) — path".
+function M.cleanTitle(title)
+  title = title or ""
+  local b1 = title:byte(1)
+  if b1 == 0xE2 then
+    local first = title:sub(1, 3)
+    if M.state(first) == "r" or first == "✳" then title = title:sub(4):gsub("^ ", "") end
+  end
+  return (title:gsub(" %([^()]*%) — .*$", ""))
+end
+
+-- Longest S line the Cardputer is sent: macOS's usual 185-byte MTU minus the 3-byte ATT header,
+-- with some slack.
+M.maxLineBytes = 180
+
+local agentCodes = { claude = "c", codex = "x" }
+
+local function field(s)
+  return (s or ""):gsub("[\t\n\r]", " ")
+end
+
+-- Cuts s to at most n bytes without splitting a UTF-8 character.
+local function cutUtf8(s, n)
+  if #s <= n then return s end
+  local i = n + 1
+  while i > 1 and (s:byte(i) or 0) >= 0x80 and s:byte(i) < 0xC0 do i = i - 1 end
+  return s:sub(1, i - 1)
+end
+
+-- Encodes agent sessions as the Cardputer's list messages, without trailing newlines:
+-- "B", one "S\t<id>\t<agent>\t<state>\t<title>\t<dir>" per agent session in input order, "E".
+function M.encodeList(sessions, home)
+  local lines = { "B" }
+  for _, s in ipairs(sessions) do
+    if s.agent then
+      local dir = s.cwd or ""
+      if home and dir:sub(1, #home) == home then dir = "~" .. dir:sub(#home + 1) end
+      local head = table.concat({ "S", field(s.id), agentCodes[s.agent] or "c", M.state(s.title) }, "\t") .. "\t"
+      local tail = "\t" .. field(dir)
+      local title = cutUtf8(field(M.cleanTitle(s.title)), math.max(0, M.maxLineBytes - #head - #tail))
+      lines[#lines + 1] = head .. title .. tail
+    end
+  end
+  lines[#lines + 1] = "E"
+  return lines
+end
+
 return M
