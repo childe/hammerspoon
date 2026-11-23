@@ -1,6 +1,7 @@
 require "dockapps"
 require "iterm_layout"
 require "iterm_agents"
+require "iterm_agents_panel"
 require "iterm_agents_ble"
 --require "window.window"
 --require "clipboard.clipboard"

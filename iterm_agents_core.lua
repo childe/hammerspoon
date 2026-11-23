@@ -104,7 +104,7 @@ function M.classify(sessions, procs, cwdsFor)
     table.insert(s.agent and agents or others, s)
   end
   local cwds = (cwdsFor and #pids > 0) and cwdsFor(pids) or {}
-  for _, s in ipairs(agents) do s.cwd = cwds[procOf[s].pid] end
+  for _, s in ipairs(agents) do s.cwd, s.elapsed = cwds[procOf[s].pid], elapsed[s] end
   -- table.sort is not stable, so ties fall back to iTerm2's order.
   table.sort(agents, function(a, b)
     if a.cwd ~= b.cwd then
@@ -148,6 +148,13 @@ M.maxLineBytes = 180
 
 local agentCodes = { claude = "c", codex = "x" }
 
+-- Replaces a leading home directory with "~".
+local function shortDir(dir, home)
+  dir = dir or ""
+  if home and (dir == home or dir:sub(1, #home + 1) == home .. "/") then return "~" .. dir:sub(#home + 1) end
+  return dir
+end
+
 local function field(s)
   return (s or ""):gsub("[\t\n\r]", " ")
 end
@@ -166,8 +173,7 @@ function M.encodeList(sessions, home)
   local lines = { "B" }
   for _, s in ipairs(sessions) do
     if s.agent then
-      local dir = s.cwd or ""
-      if home and dir:sub(1, #home) == home then dir = "~" .. dir:sub(#home + 1) end
+      local dir = shortDir(s.cwd, home)
       local head = table.concat({ "S", field(s.id), agentCodes[s.agent] or "c", M.state(s.title) }, "\t") .. "\t"
       local tail = "\t" .. field(dir)
       local title = cutUtf8(field(M.cleanTitle(s.title)), math.max(0, M.maxLineBytes - #head - #tail))
@@ -176,6 +182,73 @@ function M.encodeList(sessions, home)
   end
   lines[#lines + 1] = "E"
   return lines
+end
+
+-- Formats seconds as the largest whole unit: "42s", "2m", "3h", "2d"; "" when unknown.
+function M.age(seconds)
+  if not seconds then return "" end
+  if seconds < 60 then return seconds .. "s" end
+  if seconds < 3600 then return math.floor(seconds / 60) .. "m" end
+  if seconds < 86400 then return math.floor(seconds / 3600) .. "h" end
+  return math.floor(seconds / 86400) .. "d"
+end
+
+-- Groups agent sessions for the panel: {{dir, rows = {{id, agent, state, title, age}}}}, one group
+-- per run of sessions sharing a directory, in input order. dir is "" when the cwd is unknown.
+function M.panelGroups(sessions, home)
+  local groups = {}
+  for _, s in ipairs(sessions) do
+    if s.agent then
+      local dir = shortDir(s.cwd, home)
+      local group = groups[#groups]
+      if not group or group.dir ~= dir then
+        group = { dir = dir, rows = {} }
+        groups[#groups + 1] = group
+      end
+      group.rows[#group.rows + 1] = {
+        id = s.id, agent = s.agent, state = M.state(s.title), title = M.cleanTitle(s.title), age = M.age(s.elapsed),
+      }
+    end
+  end
+  return groups
+end
+
+local chordFlags = { "cmd", "ctrl", "alt", "shift" }
+
+-- Detects a bare tap of a modifier chord such as {ctrl = true, alt = true}: flags(f) takes each
+-- flagsChanged state and returns true when all keys are released after exactly the chord was held,
+-- key() reports a key press. Any key or extra modifier during the hold cancels the tap, so
+-- shortcuts that start with the chord, like ⌃⌥T or ⌃⌥⌘T, never fire it.
+function M.chordTap(chord)
+  local tap, held, spoiled, down = {}, false, false, false
+  local function classify(f)
+    local any, exact = false, true
+    for _, name in ipairs(chordFlags) do
+      local on = f[name] and true or false
+      if on then any = true end
+      if on and not chord[name] then return "extra", true end
+      if on ~= (chord[name] and true or false) then exact = false end
+    end
+    return exact and "exact" or (any and "partial" or "none"), any
+  end
+  function tap:flags(f)
+    local kind = classify(f or {})
+    down = kind ~= "none"
+    if kind == "extra" then
+      spoiled = true
+    elseif kind == "exact" then
+      held = true
+    elseif kind == "none" then
+      local fire = held and not spoiled
+      held, spoiled = false, false
+      return fire
+    end
+    return false
+  end
+  function tap:key()
+    if down then spoiled = true end
+  end
+  return tap
 end
 
 return M

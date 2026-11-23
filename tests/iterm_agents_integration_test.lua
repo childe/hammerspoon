@@ -28,11 +28,6 @@ utf8 = utf8 or {
 
 local state = { running = true, scripts = {}, alerts = {}, commands = {}, focusResult = true }
 
-local menubar = {}
-function menubar:setTitle(t) self.title = t end
-function menubar:setTooltip(t) self.tooltip = t end
-function menubar:setMenu(fn) self.menuFn = fn end
-
 hs = {
   application = { get = function() return state.running and {} or nil end },
   osascript = {
@@ -47,7 +42,6 @@ hs = {
     if cmd:find("^lsof") then return state.lsofOutput end
     return state.psOutput
   end,
-  menubar = { new = function() return menubar end },
   alert = { show = function(text) table.insert(state.alerts, text) end },
   -- Runs the command synchronously on start() with canned output picked by program path.
   -- Like the real hs.task, a task whose stdout pipe gets more than the 64KB pipe buffer never
@@ -100,10 +94,8 @@ state.listOutput = table.concat({
 }, "\n") .. "\n"
 
 local agents = require("iterm_agents")
-assertEqual(menubar.title, "🤖", "menubar icon set")
-assertEqual(menubar.menuFn, agents.menu, "menu built on click")
 
-local items = menubar.menuFn()
+local items = agents.menu()
 assertEqual(#items, 3, "agent item, separator, other item")
 assertEqual(items[1].title, "[claude] ✳ fix bug (claude)", "agent tab listed first with tag")
 assertEqual(items[2].title, "-", "separator between agent and other tabs")
@@ -127,7 +119,7 @@ state.psOutput = table.concat({
 }, "\n")
 state.lsofOutput = "p100\nfcwd\nn/b\np200\nfcwd\nn/a\np300\nfcwd\nn/b\n"
 state.listOutput = "1\t1\tX\t/dev/ttys001\tx\n1\t2\tY\t/dev/ttys002\ty\n1\t3\tZ\t/dev/ttys003\tz\n"
-items = menubar.menuFn()
+items = agents.menu()
 assertEqual(state.commands[#state.commands], "lsof -a -d cwd -Fn -p 100,200,300", "asks lsof for agent cwds")
 assertEqual(items[1].title, "[codex] y", "directory /a first")
 assertEqual(items[2].title, "[claude] x", "newest agent in /b next")
@@ -135,7 +127,7 @@ assertEqual(items[3].title, "[claude] z", "older agent in /b last")
 
 state.psOutput = "100 1 01:00 ttys001 claude\n"
 state.listOutput = "1\t1\tB\t/dev/ttys001\tonly agent\n"
-items = menubar.menuFn()
+items = agents.menu()
 assertEqual(#items, 1, "no separator without other tabs")
 
 -- sessionsAsync runs osascript, ps and lsof as tasks and yields the same order as sessions().
@@ -181,7 +173,7 @@ state.running = true
 
 state.running = false
 local scriptsBefore = #state.scripts
-items = menubar.menuFn()
+items = agents.menu()
 assertEqual(items[1].title, "iTerm2 未运行", "reports iTerm2 not running")
 assertEqual(#state.scripts, scriptsBefore, "does not launch iTerm2 via AppleScript")
 

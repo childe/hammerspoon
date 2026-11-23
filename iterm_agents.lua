@@ -1,6 +1,6 @@
--- Menubar list of iTerm2 tabs, with tabs running claude/codex on top, grouped by
--- the agent's directory and newest first within one.
--- The list is built when the menu opens; picking an item focuses that session.
+-- Lists iTerm2 tabs, with tabs running claude/codex on top, grouped by the agent's directory
+-- and newest first within one, and focuses a chosen session. menu() builds the tab menu that
+-- iterm_agents_panel.lua shows on a right click of 🤖.
 local core = require("iterm_agents_core")
 
 local M = {}
@@ -142,14 +142,5 @@ function M.menu()
   end
   return items
 end
-
-local menubar = hs.menubar.new()
-if menubar then
-  menubar:setTitle("🤖")
-  menubar:setTooltip("iTerm2 tabs")
-  menubar:setMenu(M.menu)
-end
-
-M.menubar = menubar
 
 return M

@@ -142,4 +142,64 @@ assert(title, "S line keeps its trailing dir field")
 assertEqual(#title % 3, 0, "title cut between whole 3-byte characters")
 assertEqual(title:sub(1, 3), "汉", "title keeps leading characters")
 
+-- classify records how long each agent process has run.
+classified = core.classify(core.parseSessions("w\t1\tS-A\t/dev/ttys013\tx\n"), procs)
+assertEqual(classified[1].elapsed, 93784, "agent elapsed recorded")
+
+-- age: compact elapsed time for the panel.
+assertEqual(core.age(nil), "", "unknown age")
+assertEqual(core.age(42), "42s", "seconds")
+assertEqual(core.age(125), "2m", "minutes")
+assertEqual(core.age(3 * 3600 + 59), "3h", "hours")
+assertEqual(core.age(2 * 86400 + 5), "2d", "days")
+
+-- panelGroups: agent sessions only, one group per directory in input order.
+local groups = core.panelGroups({
+  { id = "a", agent = "codex", title = "⠸ T1 (codex) — /x", cwd = "/Users/u/p", elapsed = 120 },
+  { id = "b", agent = "claude", title = "✳ T2 (claude) — /x", cwd = "/Users/u/p", elapsed = 7200 },
+  { id = "c", agent = "claude", title = "◐ T3", cwd = "/opt/q", elapsed = 5 },
+  { id = "d", agent = "claude", title = "T4", cwd = nil },
+  { id = "e", agent = nil, title = "zsh" },
+}, "/Users/u")
+assertEqual(#groups, 3, "one group per directory, other tabs dropped")
+assertEqual(groups[1].dir, "~/p", "home shortened to ~")
+assertEqual(#groups[1].rows, 2, "same-directory agents share a group")
+local row = groups[1].rows[1]
+assertEqual(row.id, "a", "row id")
+assertEqual(row.agent, "codex", "row agent")
+assertEqual(row.state, "r", "row state")
+assertEqual(row.title, "T1", "row title cleaned")
+assertEqual(row.age, "2m", "row age")
+assertEqual(groups[1].rows[2].state, "w", "waiting row")
+assertEqual(groups[2].dir, "/opt/q", "path outside home kept")
+assertEqual(groups[3].dir, "", "unknown cwd has empty dir")
+assertEqual(#core.panelGroups({}, "/Users/u"), 0, "no agents, no groups")
+-- A home prefix that is not a whole path component is not shortened.
+assertEqual(core.panelGroups({ { id = "x", agent = "claude", title = "t", cwd = "/Users/u2" } }, "/Users/u")[1].dir,
+  "/Users/u2", "home prefix must end at a path boundary")
+
+-- chordTap fires when exactly ctrl+alt were held together and all released, with no other key
+-- or modifier in between.
+local function run(events)
+  local tap, fired = core.chordTap({ ctrl = true, alt = true }), 0
+  for _, e in ipairs(events) do
+    if e == "key" then tap:key() elseif tap:flags(e) then fired = fired + 1 end
+  end
+  return fired
+end
+local none, ctrl, alt, both = {}, { ctrl = true }, { alt = true }, { ctrl = true, alt = true }
+local withCmd = { ctrl = true, alt = true, cmd = true }
+assertEqual(run({ ctrl, both, alt, none }), 1, "ctrl then alt, released")
+assertEqual(run({ alt, both, ctrl, none }), 1, "alt then ctrl, released")
+assertEqual(run({ ctrl, both, none }), 1, "both released at once")
+assertEqual(run({ ctrl, both, "key", none }), 0, "a key pressed while held cancels (⌃⌥T)")
+assertEqual(run({ ctrl, both, withCmd, both, none }), 0, "an extra modifier cancels (⌃⌥⌘T)")
+assertEqual(run({ ctrl, both, withCmd, "key", none }), 0, "⌃⌥⌘ shortcut does not fire")
+assertEqual(run({ ctrl, none }), 0, "ctrl alone does not fire")
+assertEqual(run({ ctrl, "key", both, none }), 0, "a key before the chord completes cancels")
+assertEqual(run({ ctrl, both, "key", none, ctrl, both, none }), 1, "state resets after release")
+assertEqual(run({ { ctrl = true, alt = true, fn = true }, none }), 1, "fn and other flags are ignored")
+assertEqual(run({ both, alt, both, none }), 1, "re-pressing within the hold still one tap")
+assertEqual(run({ "key", ctrl, both, none }), 1, "typing with no modifier held does not cancel the next tap")
+
 print("iterm_agents_core tests passed")
