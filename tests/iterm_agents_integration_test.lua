@@ -59,6 +59,13 @@ hs = {
         for i = 6, #args do t.programArgs[#t.programArgs + 1] = args[i] end
       end
       table.insert(state.tasks, t)
+      -- The real hs.task keeps its callback, and everything the callback captures, until it is
+      -- replaced: collecting the task does not release it.
+      function t:setCallback(fn)
+        callback = fn
+        t.callbackCleared = fn == nil
+        return self
+      end
       function t:start()
         local out = state.psOutput
         if program:find("osascript$") then out = state.listOutput end
@@ -152,6 +159,9 @@ assertEqual(asyncResult[1].cwd, "/a", "async records cwd")
 local lsofTask = state.tasks[#state.tasks]
 assertEqual(lsofTask.program, "/usr/sbin/lsof", "lsof runs as a task")
 assertEqual(table.concat(lsofTask.programArgs, " "), "-a -d cwd -Fn -p 100,200,300", "lsof asked for agent pids only")
+for i, t in ipairs(state.tasks) do
+  assert(t.callbackCleared, "task " .. i .. " released its callback after finishing")
+end
 
 -- ps output on a busy Mac is larger than the pipe buffer (68KB measured).
 local psLines = { state.psOutput }

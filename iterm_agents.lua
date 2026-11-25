@@ -68,6 +68,9 @@ local tasks = {}
 -- The program's stdout goes to a temp file, read after it exits: hs.task does not drain a
 -- stdout pipe until the program exits, so output over the 64KB pipe buffer (ps -A is ~68KB
 -- on a busy Mac) blocks the program forever.
+-- hs.task holds its callback, and everything the callback captures (here the whole ps output and
+-- the parsed process table), until the callback is replaced; collecting the task does not release
+-- it. Without setCallback(nil) every listing stayed in memory: 11GB after a day of pushing every 2s.
 local function run(path, args, done)
   local file = os.tmpname()
   local shArgs = { "-c", 'out="$1"; shift; "$@" > "$out"', "sh", file, path }
@@ -75,6 +78,7 @@ local function run(path, args, done)
   local task
   task = hs.task.new("/bin/sh", function(code)
     tasks[task] = nil
+    task:setCallback(nil)
     local f = io.open(file)
     local out = f and f:read("*a") or ""
     if f then f:close() end
